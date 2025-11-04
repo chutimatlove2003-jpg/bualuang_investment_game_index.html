@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bualuang Investment Game (v2)</title>
+<style>
+  :root{--blue:#0b4fa3;--red:#d62839;--muted:#6b7a89;--card:#fff}
+  *{box-sizing:border-box}
+  body{font-family:"Noto Sans Thai",system-ui,Arial,sans-serif;margin:0;background:linear-gradient(180deg,#f6fbff,#fff);color:#123447}
+  .wrap{max-width:1100px;margin:18px auto;padding:18px}
+  .topbar{display:flex;align-items:center;gap:12px}
+  .logo{width:64px;height:64px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--red));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px}
+  h1{margin:0;color:var(--blue);font-size:20px}
+  .card{background:var(--card);border-radius:12px;padding:14px;margin-top:14px;box-shadow:0 10px 30px rgba(12,38,66,0.06)}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  input[type=text]{padding:9px;border-radius:10px;border:1px solid #e6eefc;min-width:220px}
+  input[type=number]{padding:8px;border-radius:8px;border:1px solid #e6eefc;width:110px}
+  button{background:var(--blue);color:#fff;border:0;padding:10px 14px;border-radius:10px;cursor:pointer}
+  button.alt{background:var(--red)}
+  .small{color:var(--muted);font-size:13px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{padding:10px;border-bottom:1px solid #f1f6fb;text-align:left;vertical-align:middle}
+  th{background:#f7fbff;color:var(--blue);font-weight:700}
+  .badge{display:inline-block;padding:6px 10px;border-radius:10px;background:#eef6ff;color:var(--blue);font-weight:700}
+  .player-card{display:flex;gap:12px;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(90deg,rgba(11,79,163,0.03),rgba(214,40,57,0.02));margin-bottom:8px}
+  .bar{height:14px;border-radius:8px;background:#e6eefc;overflow:hidden}
+  .muted{color:#6b7a89;font-size:13px}
+  .center{text-align:center}
+  .msg{color:#b00020;font-weight:700;margin-top:8px}
+  @media(max-width:800px){ .topbar{flex-direction:column;align-items:flex-start} input[type=text]{width:100%} input[type=number]{width:90px} }
+  .icon{font-size:18px;margin-right:6px}
+  .flex{display:flex;gap:8px;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="logo" aria-hidden="true">BBL</div>
+    <div style="flex:1">
+      <h1>เกมจำลองการลงทุน โดย หลักทรัพย์บัวหลวง</h1>
+      <div class="small">เริ่มต้น 50,000 บาท • สินทรัพย์: เงินฝาก, หุ้น, ตราสารหนี้, ทองคำ • 5 สถานการณ์</div>
+    </div>
+    <div style="text-align:right">
+      <div class="small">เชื่อมกับ Google Sheet</div>
+    </div>
+  </div>
+
+  <div id="setup" class="card">
+    <h3>เพิ่มผู้เล่น</h3>
+    <div class="controls">
+      <input id="playerName" placeholder="พิมพ์ชื่อผู้เล่น เช่น พลอย" type="text" />
+      <button id="addBtn">➕ เพิ่มผู้เล่น</button>
+      <button id="startBtn" class="alt">▶ เริ่มเกม</button>
+      <button id="resetBtn">🔁 เริ่มใหม่</button>
+      <button id="viewLB">🏆 ดู Leaderboard</button>
+    </div>
+    <div id="players" style="margin-top:12px"></div>
+  </div>
+
+  <div id="game" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><span class="badge" id="roundBadge">รอบ 1/5</span></div>
+      <div class="small" id="hint">กรอกยอดลงทุนให้รวมเท่ากับยอดคงเหลือของแต่ละคน</div>
+    </div>
+
+    <div style="margin-top:12px;overflow:auto">
+      <table>
+        <thead><tr><th>ชื่อ</th><th>ยอดคงเหลือ (บาท)</th><th>💰 เงินฝาก</th><th>📈 หุ้น</th><th>📜 ตราสารหนี้</th><th>🥇 ทองคำ</th></tr></thead>
+        <tbody id="allocRows"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="calcBtn">คำนวณรอบ</button>
+      <button id="finishBtn" class="alt">💾 จบเกมและบันทึกคะแนน</button>
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <h4>ผลลัพธ์ย้อนหลัง (รอบล่าสุด)</h4>
+      <table id="historyTable"><thead><tr><th>ชื่อ</th><th>รอบ</th><th>ยอดจบรอบ</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div id="leaderboard" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>🏆 Leaderboard</h3>
+      <div><button id="refreshLB">🔄 รีเฟรช</button> <button id="backToGame" class="alt">⬅ กลับ</button></div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
+      <div style="flex:1;min-width:330px">
+        <table id="lbTable"><thead><tr><th>อันดับ</th><th>ชื่อ</th><th>ยอดสุดท้าย</th><th>วันที่</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div style="flex:1;min-width:300px">
+        <h4 class="small">กราฟเปรียบเทียบยอดสุดท้าย</h4>
+        <canvas id="barChart" width="400" height="240" style="width:100%;background:#fff;border-radius:8px;padding:8px"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <h4>รายละเอียดการลงทุน (ผู้เล่นแต่ละคน)</h4>
+      <div id="playerDetails"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px" class="small center">ออกแบบโดย หลักทรัพย์บัวหลวง (Bualuang Securities)</div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwssqT_Bp0YF-wB6WLKY303o2wHcO-wpT0iTYPA9wdx1dFMBgyLfEyABzYJETuw1JI/exec";
+const GSHEET_ID = "13U1DL3zEh5L-LZi6B-8xqPJYMFTb_DyGzkUlCKvtPnA";
+const START_BALANCE = 50000;
+const scenarios = [
+  {cash:0.00, stock:10.00, bond:4.00, gold:3.00},
+  {cash:0.50, stock:15.00, bond:0.00, gold:8.00},
+  {cash:0.50, stock:-15.00, bond:-4.00, gold:20.00},
+  {cash:0.00, stock:10.00, bond:3.00, gold:-7.00},
+  {cash:2.50, stock:1.50, bond:5.00, gold:-5.00}
+];
+
+let players=[]; let currentRound=1;
+function $(id){return document.getElementById(id);}
+
+/* players */
+$('addBtn').addEventListener('click',()=>{
+  const name = $('playerName').value.trim();
+  if(!name) return alert('กรุณากรอกชื่อผู้เล่น');
+  if(players.some(p=>p.name.toLowerCase()===name.toLowerCase())) return alert('ชื่อนี้มีแล้ว');
+  players.push({name, balance: START_BALANCE, history: []});
+  $('playerName').value=''; renderPlayers();
+});
+function renderPlayers(){
+  const d=$('players'); d.innerHTML='';
+  if(players.length===0){ d.innerHTML='<div class="small">ยังไม่มีผู้เล่น</div>'; return; }
+  players.forEach((p,i)=>{ const el=document.createElement('div'); el.className='player-card'; el.innerHTML=`<div style="flex:1"><strong>${p.name}</strong><div class="muted">ยอดคงเหลือ: ${p.balance.toLocaleString(undefined,{minimumFractionDigits:2})} บาท</div></div>`; d.appendChild(el); });
+}
+
+/* start */
+$('startBtn').addEventListener('click',()=>{
+  if(players.length===0) return alert('เพิ่มผู้เล่นก่อนเริ่มเกม');
+  $('setup').style.display='none'; $('game').style.display='block';
+  currentRound=1; $('roundBadge').textContent=`รอบ ${currentRound}/5`; renderAllocRows();
+});
+$('resetBtn').addEventListener('click',()=>{ if(!confirm('เริ่มใหม่ทั้งหมด?')) return; players=[]; renderPlayers(); $('game').style.display='none'; $('setup').style.display='block'; $('historyTable').querySelector('tbody').innerHTML=''; });
+
+/* render rows */
+function renderAllocRows(){ const tbody=$('allocRows'); tbody.innerHTML=''; players.forEach((p,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${p.name}</td><td id="bal-${i}">${p.balance.toFixed(2)}</td><td><input id="cash-${i}" type="number" min="0" step="0.01" value="0"></td><td><input id="stock-${i}" type="number" min="0" step="0.01" value="0"></td><td><input id="bond-${i}" type="number" min="0" step="0.01" value="0"></td><td><input id="gold-${i}" type="number" min="0" step="0.01" value="0"></td>`; tbody.appendChild(tr); }); }
+
+/* calc */
+$('calcBtn').addEventListener('click',()=>{
+  $('msg').textContent='';
+  for(let i=0;i<players.length;i++){
+    const p=players[i];
+    const sum = (+( $('cash-'+i).value||0) + +($('stock-'+i).value||0) + +($('bond-'+i).value||0) + +($('gold-'+i).value||0)).toFixed(2);
+    if(Math.abs(sum - p.balance.toFixed(2)) > 0.01){ $('msg').textContent = `${p.name} ยอดรวมต้องเท่ากับยอดคงเหลือ ${p.balance.toFixed(2)} บาท (ตอนนี้รวม = ${sum})`; return; }
+  }
+  const sc = scenarios[currentRound-1];
+  for(let i=0;i<players.length;i++){
+    const p=players[i];
+    const d=+($('cash-'+i).value||0), s=+($('stock-'+i).value||0), b=+($('bond-'+i).value||0), g=+($('gold-'+i).value||0);
+    const resD = +(d*(1+sc.cash/100)).toFixed(2);
+    const resS = +(s*(1+sc.stock/100)).toFixed(2);
+    const resB = +(b*(1+sc.bond/100)).toFixed(2);
+    const resG = +(g*(1+sc.gold/100)).toFixed(2);
+    const end = +(resD+resS+resB+resG).toFixed(2);
+    p.history.push({round:currentRound,end,alloc:{cash:d,stock:s,bond:b,gold:g}});
+    p.balance=end;
+    const row = document.createElement('tr'); row.innerHTML=`<td>${p.name}</td><td>${currentRound}</td><td>${end.toFixed(2)}</td>`; $('historyTable').querySelector('tbody').appendChild(row);
+  }
+  if(currentRound < scenarios.length){ currentRound++; $('roundBadge').textContent=`รอบ ${currentRound}/5`; renderAllocRows(); players.forEach((p,idx)=> $('bal-'+idx).textContent = p.balance.toFixed(2)); } else { alert('ครบ 5 รอบแล้ว! ให้กด "จบเกมและบันทึกคะแนน" เพื่อส่งผลไปยัง Leaderboard'); }
+});
+
+/* finish -> post to Apps Script */
+$('finishBtn').addEventListener('click', async ()=>{
+  for(const p of players){
+    try{
+      await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:p.name,final_amount:p.balance})});
+    }catch(e){console.error(e); alert('เกิดข้อผิดพลาดในการส่งผล'); return;}
+  }
+  alert('บันทึกผลเรียบร้อย! ไปที่หน้า Leaderboard เพื่อดูผล');
+});
+
+/* leaderboard */
+$('viewLB').addEventListener('click', ()=>{ $('setup').style.display='none'; $('leaderboard').style.display='block'; loadLeaderboard(); renderPlayerDetails(); });
+$('backToGame').addEventListener('click',()=>{ $('leaderboard').style.display='none'; $('setup').style.display='block'; });
+
+async function loadLeaderboard(){
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${GSHEET_ID}/export?format=csv`;
+  try{
+    const res = await fetch(csvUrl);
+    const txt = await res.text();
+    const rows = txt.trim().split('\\n').map(r=>r.split(','));
+    const data = rows.slice(1).map(r=>({date:r[0],name:r[1],amount:parseFloat(r[2]||0)}));
+    data.sort((a,b)=>b.amount-a.amount);
+    const tbody=$('lbTable').querySelector('tbody'); tbody.innerHTML='';
+    const labels = []; const values = [];
+    data.forEach((d,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${d.name}</td><td>${d.amount.toLocaleString()}</td><td>${d.date}</td>`; tbody.appendChild(tr); labels.push(d.name); values.push(d.amount); });
+    drawBarChart(labels, values);
+  }catch(err){ console.error(err); alert('โหลด Leaderboard ล้มเหลว: ตรวจสอบการตั้งค่าแชร์ของ Google Sheet'); }
+}
+
+/* small chart drawer */
+function drawBarChart(labels, values){
+  const c = document.getElementById('barChart'); const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  if(values.length===0) return;
+  const padding = 20; const maxVal = Math.max(...values); const barW = (c.width - padding*2) / values.length * 0.7;
+  for(let i=0;i<values.length;i++){
+    const x = padding + i * ((c.width - padding*2)/values.length) + ((c.width - padding*2)/values.length - barW)/2;
+    const h = (values[i] / maxVal) * (c.height - 60);
+    const y = c.height - padding - h;
+    const grad = ctx.createLinearGradient(x, y, x+barW, y+h);
+    grad.addColorStop(0, '#1a4f9c'); grad.addColorStop(1, '#d62839');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, barW, h);
+    ctx.fillStyle = '#123447'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(labels[i], x + barW/2, c.height - padding + 14);
+    ctx.fillText(values[i].toLocaleString(undefined,{maximumFractionDigits:2}), x + barW/2, y - 6);
+  }
+}
+
+/* render player details (local session history) */
+function renderPlayerDetails(){
+  const wrap = $('playerDetails'); wrap.innerHTML='';
+  players.forEach((p,idx)=>{
+    const card = document.createElement('div'); card.className='card'; card.style.marginBottom='8px';
+    const title = document.createElement('div'); title.innerHTML = `<strong>${p.name}</strong> — ยอดสุดท้าย ${p.balance.toLocaleString(undefined,{minimumFractionDigits:2})} บาท`;
+    card.appendChild(title);
+    const last = p.history[p.history.length-1];
+    if(last && last.alloc){
+      const total = last.alloc.cash + last.alloc.stock + last.alloc.bond + last.alloc.gold || 1;
+      const cashPct = last.alloc.cash/total*100;
+      const stockPct = last.alloc.stock/total*100;
+      const bondPct = last.alloc.bond/total*100;
+      const goldPct = last.alloc.gold/total*100;
+      const info = document.createElement('div'); info.className='muted'; info.style.marginTop='8px';
+      info.innerHTML = `รอบล่าสุด: ${last.round} — สัดส่วนการลงทุน (บาท): เงินฝาก ${last.alloc.cash.toLocaleString()}, หุ้น ${last.alloc.stock.toLocaleString()}, ตราสารหนี้ ${last.alloc.bond.toLocaleString()}, ทองคำ ${last.alloc.gold.toLocaleString()}`;
+      card.appendChild(info);
+      const bars = document.createElement('div'); bars.style.marginTop='8px';
+      bars.innerHTML = `
+        <div class="alloc-label">เงินฝาก ${cashPct.toFixed(1)}%</div>
+        <div class="bar" style="margin-bottom:6px"><i style="width:${cashPct}%;background:linear-gradient(90deg,#1a4f9c,#6fb1ff)"></i></div>
+        <div class="alloc-label">หุ้น ${stockPct.toFixed(1)}%</div>
+        <div class="bar" style="margin-bottom:6px"><i style="width:${stockPct}%;background:linear-gradient(90deg,#ff7b7b,var(--red))"></i></div>
+        <div class="alloc-label">ตราสารหนี้ ${bondPct.toFixed(1)}%</div>
+        <div class="bar" style="margin-bottom:6px"><i style="width:${bondPct}%;background:linear-gradient(90deg,#ffd3a5,#ffb86b)"></i></div>
+        <div class="alloc-label">ทองคำ ${goldPct.toFixed(1)}%</div>
+        <div class="bar" style="margin-bottom:6px"><i style="width:${goldPct}%;background:linear-gradient(90deg,#fff1a8,#ffd166)"></i></div>
+      `;
+      card.appendChild(bars);
+    } else {
+      const info = document.createElement('div'); info.className='muted'; info.style.marginTop='8px'; info.textContent='ไม่มีข้อมูลการลงทุนในรอบล่าสุด (ยังไม่ได้เล่นหรือบันทึก)';
+      card.appendChild(info);
+    }
+    wrap.appendChild(card);
+  });
+}
+
+</script>
+</body>
+</html>
